@@ -11,37 +11,43 @@ tokenizer = DistilBertTokenizer.from_pretrained("./fake_news_model")
 # Load dataset
 df = pd.read_csv("sentiment_fake_or_real_news.csv")
 
-# Remove NaN (missing) values
+# Drop missing or empty text
 df = df.dropna(subset=['cleaned_text'])
-
-# Ensure all values in 'cleaned_text' are strings
 df['cleaned_text'] = df['cleaned_text'].astype(str)
-
-# Check for empty strings and remove them
 df = df[df['cleaned_text'].str.strip() != ""]
 
-# Ensure 'label' column exists
+# --- FIX: Clean label column ---
 if 'label' not in df.columns:
     raise ValueError("Error: 'label' column is missing in the dataset.")
 
-# Convert categorical labels to integers if necessary (e.g., "fake" → 0, "real" → 1)
+# Drop missing labels
+df = df.dropna(subset=['label'])
+
+# Map string labels to integers if needed
 if df['label'].dtype == object:
     label_mapping = {"fake": 0, "real": 1}
     df['label'] = df['label'].map(label_mapping)
 
-# Define the 'texts' variable as a list of 'cleaned_text' values
-texts = df['cleaned_text'].tolist()
+# Drop any remaining NaNs after mapping
+df = df.dropna(subset=['label'])
 
-# Tokenize the text using batch_encode_plus
+# Convert label column to integers
+df['label'] = df['label'].astype(int)
+
+# Optional: Debug print to confirm label values
+print("Unique label values after cleaning:", df['label'].unique())
+
+# Tokenize the text
+texts = df['cleaned_text'].tolist()
 encodings = tokenizer.batch_encode_plus(
-    texts, 
-    truncation=True, 
-    padding=True, 
-    max_length=512, 
+    texts,
+    truncation=True,
+    padding=True,
+    max_length=512,
     return_tensors="pt"
 )
 
-# Convert to PyTorch tensors
+# Dataset class
 class FakeNewsDataset(Dataset):
     def __init__(self, encodings, labels):
         self.encodings = encodings
@@ -52,27 +58,45 @@ class FakeNewsDataset(Dataset):
 
     def __getitem__(self, idx):
         return {
-            "input_ids": torch.tensor(self.encodings['input_ids'][idx]),
-            "attention_mask": torch.tensor(self.encodings['attention_mask'][idx]),
+            "input_ids": self.encodings['input_ids'][idx],
+            "attention_mask": self.encodings['attention_mask'][idx],
             "labels": torch.tensor(self.labels[idx])
         }
 
 # Create dataset
 eval_dataset = FakeNewsDataset(encodings, df['label'].tolist())
 
-# Function to compute evaluation metrics
+# Metric computation
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = pred.predictions.argmax(-1)
     acc = accuracy_score(labels, preds)
     precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='weighted')
-    return {"accuracy": acc, "precision": precision, "recall": recall, "f1": f1}
+    return {
+        "accuracy": acc,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
 
-# Define training arguments
-training_args = TrainingArguments(output_dir="./results", per_device_eval_batch_size=8)
+# Evaluation config
+training_args = TrainingArguments(
+    output_dir="./results",
+    per_device_eval_batch_size=8,
+    do_train=False,
+    do_eval=True,
+    logging_dir="./logs"
+)
 
-# Evaluate model
-trainer = Trainer(model=model, args=training_args, eval_dataset=eval_dataset, compute_metrics=compute_metrics)
+# Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    eval_dataset=eval_dataset,
+    compute_metrics=compute_metrics
+)
 
+# Evaluate
 eval_results = trainer.evaluate()
+print("Evaluation Results:")
 print(eval_results)

@@ -15,24 +15,38 @@ import transformers
 
 print("Transformers version:", transformers.__version__)
 
-# Load your preprocessed dataset
-df = pd.read_csv("processed_fake_or_real_news.csv")
+# Read CSV safely with low_memory disabled
+df = pd.read_csv("processed_fake_or_real_news.csv", low_memory=False)
 
 # Ensure required columns exist
 if 'cleaned_text' not in df.columns or 'label' not in df.columns:
     raise ValueError("Dataset must contain 'cleaned_text' and 'label' columns.")
 
-# Ensure label column is integer
+# Drop rows where 'label' or 'cleaned_text' is missing
+df = df.dropna(subset=['label', 'cleaned_text'])
+
+# Handle string labels if needed
+if df['label'].dtype == object or isinstance(df['label'].iloc[0], str):
+    label_mapping = {'fake': 0, 'real': 1}
+    df['label'] = df['label'].map(label_mapping)
+
+# Drop rows where mapping failed (i.e., labels were not 'fake' or 'real')
+df = df.dropna(subset=['label'])
+
+# Convert label to integer
 df['label'] = df['label'].astype(int)
 
-# Drop NaNs and ensure text is string type
-df = df.dropna(subset=['cleaned_text'])
+# Ensure text is string type
 df['cleaned_text'] = df['cleaned_text'].astype(str)
+
+# Optional: Print value counts for sanity check
+print("\nLabel distribution:")
+print(df['label'].value_counts())
 
 # Split dataset
 train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['label'], random_state=42)
 
-# Convert to HuggingFace Datasets
+# Convert to HuggingFace Dataset format
 train_dataset = Dataset.from_dict({
     'cleaned_text': train_df['cleaned_text'].tolist(),
     'label': train_df['label'].tolist()
@@ -46,13 +60,14 @@ test_dataset = Dataset.from_dict({
 tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=2)
 
-# Optional: Apply class weights
+# Compute class weights
 class_weights = compute_class_weight(
     class_weight='balanced',
     classes=np.unique(train_df['label']),
     y=train_df['label']
 )
 class_weights = torch.tensor(class_weights, dtype=torch.float)
+print("\nClass weights:", class_weights)
 
 # Tokenization function
 def tokenize(batch):
@@ -66,10 +81,10 @@ test_dataset = test_dataset.map(tokenize, batched=True)
 train_dataset.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
 test_dataset.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
 
-# Define training arguments
+# Training arguments
 training_args = TrainingArguments(
     output_dir="./fake_news_model",
-    evaluation_strategy="epoch",              # Correct arg for transformers >= 4.26
+    evaluation_strategy="epoch",              
     save_strategy="epoch",
     learning_rate=2e-5,
     per_device_train_batch_size=8,
@@ -84,7 +99,7 @@ training_args = TrainingArguments(
     greater_is_better=True,
 )
 
-# Define compute metrics function
+# Metrics function
 def compute_metrics(pred):
     from sklearn.metrics import accuracy_score, precision_recall_fscore_support
     preds = pred.predictions.argmax(-1)
@@ -98,7 +113,7 @@ def compute_metrics(pred):
         "f1": f1
     }
 
-# Initialize Trainer
+# Trainer
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -108,10 +123,8 @@ trainer = Trainer(
     callbacks=[EarlyStoppingCallback(early_stopping_patience=2)]
 )
 
-# Start training
 train_output = trainer.train()
 
-# Final messages
 print("\n✅ Model training completed successfully!")
 print(f"Final training loss: {train_output.training_loss:.4f}")
 print(f"Trained for {training_args.num_train_epochs} epochs")

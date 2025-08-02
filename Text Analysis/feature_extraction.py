@@ -3,7 +3,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import re
 
 # Load the preprocessed file
-csv_path = "processed_fake_or_real_news.csv"  # updated filename
+csv_path = "processed_fake_or_real_news.csv" 
 df = pd.read_csv(csv_path)
 
 # Check for cleaned_text
