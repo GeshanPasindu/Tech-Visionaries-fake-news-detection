@@ -15,9 +15,9 @@ MOTION_VECTORS_DIR = os.path.join(PROCESSED_DATA_DIR, 'motion_vectors')
 # --- Training Hyperparameters ---
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-LEARNING_RATE = 1e-9
+LEARNING_RATE = 3e-5
 BATCH_SIZE = 8
-NUM_EPOCHS = 100
+NUM_EPOCHS = 350
 NUM_WORKERS = 4
 
 

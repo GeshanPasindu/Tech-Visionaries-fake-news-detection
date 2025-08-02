@@ -1,7 +1,7 @@
 import numpy as np
 
 # Replace with the actual path to your file
-file_path = 'C:/Users/MSI/Documents/Git/Tech-Visionaries-fake-news-detection/Video Analysis/data/processed/motion_vectors/aapnvogymq_mv.npy'
+file_path = 'C:/Users/MSI/Documents/Git/Tech-Visionaries-fake-news-detection/Video Analysis/data/processed/motion_vectors/aagfhgtpmv_mv.npy'
 
 try:
     # Load the motion vector data

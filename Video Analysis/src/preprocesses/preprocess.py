@@ -85,87 +85,9 @@ print(f'Running on device: {DEVICE}')
 #         print(f"Error extracting motion vectors for {video_basename}: {e}")
 #         np.save(output_path, np.zeros((1, max_vectors_per_frame, 2), dtype=np.int16))
 
-# def extract_motion_vectors_with_optical_flow(video_path, output_dir):
-#     """
-#     Calculates dense optical flow using GPU (CUDA) enabled OpenCV.
-#     """
-#     video_basename = os.path.splitext(os.path.basename(video_path))[0]
-#     output_path = os.path.join(output_dir, f'{video_basename}_mv.npy')
-
-#     if os.path.exists(output_path):
-#         return
-
-#     try:
-#         cap = cv2.VideoCapture(video_path)
-#         all_frames_mv = []
-#         max_vectors_per_frame = 512
-
-#         ret, prev_frame = cap.read()
-#         if not ret:
-#             np.save(output_path, np.zeros((TARGET_FRAMES, max_vectors_per_frame, 2), dtype=np.int16))
-#             return
-            
-#         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-        
-        
-#         gpu_prev_gray = cv2.cuda_GpuMat()
-#         gpu_prev_gray.upload(prev_gray)
-
-        
-#         cuda_flow = cv2.cuda_FarnebackOpticalFlow.create(5, 0.5, False, 15, 3, 5, 1.2, 0)
-
-#         while True:
-#             ret, curr_frame = cap.read()
-#             if not ret:
-#                 break
-
-#             curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-            
-#             gpu_curr_gray = cv2.cuda_GpuMat()
-#             gpu_curr_gray.upload(curr_gray)
-
-#             gpu_flow = cuda_flow.calc(gpu_prev_gray, gpu_curr_gray, None)
-
-#             flow = gpu_flow.download()
-
-#             height, width, _ = flow.shape
-#             step = int(np.sqrt((height * width) / max_vectors_per_frame))
-#             y_coords = np.arange(0, height, step)
-#             x_coords = np.arange(0, width, step)
-            
-#             sampled_vectors = []
-#             for y in y_coords:
-#                 for x in x_coords:
-#                     if len(sampled_vectors) < max_vectors_per_frame:
-#                         dx, dy = flow[y, x]
-#                         sampled_vectors.append([dx, dy])
-
-#             if len(sampled_vectors) < max_vectors_per_frame:
-#                 padding_needed = max_vectors_per_frame - len(sampled_vectors)
-#                 sampled_vectors.extend([[0, 0]] * padding_needed)
-
-#             all_frames_mv.append(np.array(sampled_vectors, dtype=np.int16))
-
-#             # <<< 6. Update the previous frame on the GPU >>>
-#             gpu_prev_gray = gpu_curr_gray
-
-#         cap.release()
-        
-#         if len(all_frames_mv) < TARGET_FRAMES:
-#              padding_needed = TARGET_FRAMES - len(all_frames_mv)
-#              zero_padding_frame = np.zeros((max_vectors_per_frame, 2), dtype=np.int16)
-#              all_frames_mv.extend([zero_padding_frame] * padding_needed)
-
-#         final_mv_array = np.array(all_frames_mv[:TARGET_FRAMES])
-#         np.save(output_path, final_mv_array)
-
-#     except Exception as e:
-#         print(f"Error extracting GPU optical flow for {video_basename}: {e}")
-#         np.save(output_path, np.zeros((TARGET_FRAMES, max_vectors_per_frame, 2), dtype=np.int16))
-
 def extract_motion_vectors_with_optical_flow(video_path, output_dir):
     """
-    Calculates and saves dense optical flow as motion vectors using the CPU.
+    Calculates dense optical flow using GPU (CUDA) enabled OpenCV.
     """
     video_basename = os.path.splitext(os.path.basename(video_path))[0]
     output_path = os.path.join(output_dir, f'{video_basename}_mv.npy')
@@ -184,6 +106,13 @@ def extract_motion_vectors_with_optical_flow(video_path, output_dir):
             return
             
         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+        
+        
+        gpu_prev_gray = cv2.cuda_GpuMat()
+        gpu_prev_gray.upload(prev_gray)
+
+        
+        cuda_flow = cv2.cuda_FarnebackOpticalFlow.create(5, 0.5, False, 15, 3, 5, 1.2, 0)
 
         while True:
             ret, curr_frame = cap.read()
@@ -191,15 +120,14 @@ def extract_motion_vectors_with_optical_flow(video_path, output_dir):
                 break
 
             curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
+            
+            gpu_curr_gray = cv2.cuda_GpuMat()
+            gpu_curr_gray.upload(curr_gray)
 
-            # Standard CPU-based optical flow calculation
-            flow = cv2.calcOpticalFlowFarneback(
-                prev_gray, curr_gray, None, 
-                pyr_scale=0.5, levels=3, winsize=15, 
-                iterations=3, poly_n=5, poly_sigma=1.2, flags=0
-            )
+            gpu_flow = cuda_flow.calc(gpu_prev_gray, gpu_curr_gray, None)
 
-            # Sampling logic remains the same
+            flow = gpu_flow.download()
+
             height, width, _ = flow.shape
             step = int(np.sqrt((height * width) / max_vectors_per_frame))
             y_coords = np.arange(0, height, step)
@@ -218,7 +146,8 @@ def extract_motion_vectors_with_optical_flow(video_path, output_dir):
 
             all_frames_mv.append(np.array(sampled_vectors, dtype=np.int16))
 
-            prev_gray = curr_gray
+            # <<< 6. Update the previous frame on the GPU >>>
+            gpu_prev_gray = gpu_curr_gray
 
         cap.release()
         
@@ -231,8 +160,79 @@ def extract_motion_vectors_with_optical_flow(video_path, output_dir):
         np.save(output_path, final_mv_array)
 
     except Exception as e:
-        print(f"Error extracting optical flow for {video_basename}: {e}")
+        print(f"Error extracting GPU optical flow for {video_basename}: {e}")
         np.save(output_path, np.zeros((TARGET_FRAMES, max_vectors_per_frame, 2), dtype=np.int16))
+
+# def extract_motion_vectors_with_optical_flow(video_path, output_dir):
+#     """
+#     Calculates and saves dense optical flow as motion vectors using the CPU.
+#     """
+#     video_basename = os.path.splitext(os.path.basename(video_path))[0]
+#     output_path = os.path.join(output_dir, f'{video_basename}_mv.npy')
+
+#     if os.path.exists(output_path):
+#         return
+
+#     try:
+#         cap = cv2.VideoCapture(video_path)
+#         all_frames_mv = []
+#         max_vectors_per_frame = 512
+
+#         ret, prev_frame = cap.read()
+#         if not ret:
+#             np.save(output_path, np.zeros((TARGET_FRAMES, max_vectors_per_frame, 2), dtype=np.int16))
+#             return
+            
+#         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+
+#         while True:
+#             ret, curr_frame = cap.read()
+#             if not ret:
+#                 break
+
+#             curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
+
+#             # Standard CPU-based optical flow calculation
+#             flow = cv2.calcOpticalFlowFarneback(
+#                 prev_gray, curr_gray, None, 
+#                 pyr_scale=0.5, levels=3, winsize=15, 
+#                 iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+#             )
+
+#             # Sampling logic remains the same
+#             height, width, _ = flow.shape
+#             step = int(np.sqrt((height * width) / max_vectors_per_frame))
+#             y_coords = np.arange(0, height, step)
+#             x_coords = np.arange(0, width, step)
+            
+#             sampled_vectors = []
+#             for y in y_coords:
+#                 for x in x_coords:
+#                     if len(sampled_vectors) < max_vectors_per_frame:
+#                         dx, dy = flow[y, x]
+#                         sampled_vectors.append([dx, dy])
+
+#             if len(sampled_vectors) < max_vectors_per_frame:
+#                 padding_needed = max_vectors_per_frame - len(sampled_vectors)
+#                 sampled_vectors.extend([[0, 0]] * padding_needed)
+
+#             all_frames_mv.append(np.array(sampled_vectors, dtype=np.int16))
+
+#             prev_gray = curr_gray
+
+#         cap.release()
+        
+#         if len(all_frames_mv) < TARGET_FRAMES:
+#              padding_needed = TARGET_FRAMES - len(all_frames_mv)
+#              zero_padding_frame = np.zeros((max_vectors_per_frame, 2), dtype=np.int16)
+#              all_frames_mv.extend([zero_padding_frame] * padding_needed)
+
+#         final_mv_array = np.array(all_frames_mv[:TARGET_FRAMES])
+#         np.save(output_path, final_mv_array)
+
+#     except Exception as e:
+#         print(f"Error extracting optical flow for {video_basename}: {e}")
+#         np.save(output_path, np.zeros((TARGET_FRAMES, max_vectors_per_frame, 2), dtype=np.int16))
 
 
 def process_video_with_mtcnn(video_path, frames_dir, landmarks_dir, mtcnn, landmarker):
@@ -318,8 +318,7 @@ def process_video_with_mtcnn(video_path, frames_dir, landmarks_dir, mtcnn, landm
 
 
 def main():
-    """Main function to orchestrate the entire preprocessing workflow."""
-    print("🚀 Starting preprocessing pipeline...")
+    print(" Starting preprocessing pipeline...")
     start_time = time.time()
 
     os.makedirs(FRAMES_DIR, exist_ok=True)

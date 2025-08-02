@@ -10,10 +10,12 @@ from sklearn.model_selection import train_test_split
 from config import *
 
 class DeepfakeDataset(Dataset):
-    def __init__(self, video_ids, labels, transform=None):
-        self.transform = transform
+    def __init__(self, video_ids, labels,real_transform=None, fake_transform=None):
+        self.transform = None
         self.video_ids = video_ids
         self.labels = labels
+        self.real_transform = real_transform
+        self.fake_transform = fake_transform
         print(f"Initialized dataset split. Found {len(self.video_ids)} valid videos.")
 
     def __len__(self):
@@ -22,6 +24,8 @@ class DeepfakeDataset(Dataset):
     def __getitem__(self, idx):
         video_id = self.video_ids[idx]
         label = self.labels[idx]
+
+        transform_to_apply = self.real_transform if label == 0 else self.fake_transform
 
         video_basename = os.path.splitext(video_id)[0]
         frame_folder = os.path.normpath(os.path.join(FRAMES_DIR, video_basename))
@@ -48,8 +52,11 @@ class DeepfakeDataset(Dataset):
         for frame_file, landmark_file in zip(frame_files_to_load, landmark_files_to_load):
             frame_path = os.path.join(frame_folder, frame_file)
             frame = Image.open(frame_path).convert("RGB")
-            if self.transform:
-                frame = self.transform(frame)
+            # if self.transform:
+            #     frame = self.transform(frame)
+            # frames.append(frame)
+            if transform_to_apply:
+                frame = transform_to_apply(frame)
             frames.append(frame)
             
             landmark_path = os.path.join(landmark_folder, landmark_file)
@@ -105,9 +112,31 @@ def get_data_loaders():
     valid_df = df[df['is_valid']].copy()
     print(f"Found {len(valid_df)} videos with complete data out of {len(df)} total.")
     
-    train_val_df, test_df = train_test_split(valid_df, test_size=(1 - TRAIN_SPLIT), random_state=42, stratify=valid_df['label'])
-    val_test_ratio = VALID_SPLIT / (1 - TRAIN_SPLIT)
-    val_df, test_df = train_test_split(test_df, test_size=(1-val_test_ratio), random_state=42, stratify=test_df['label'])
+    # train_val_df, test_df = train_test_split(valid_df, test_size=(1 - TRAIN_SPLIT), random_state=42, stratify=valid_df['label'])
+    # val_test_ratio = VALID_SPLIT / (1 - TRAIN_SPLIT)
+    # val_df, test_df = train_test_split(test_df, test_size=(1-val_test_ratio), random_state=42, stratify=test_df['label'])
+    train_df, val_df = train_test_split(
+        valid_df, 
+        train_size=0.8,
+        random_state=42, 
+        stratify=valid_df['label']
+    )
+
+    # Strong augmentation for the minority 'REAL' class
+    real_train_transform = transforms.Compose([
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    
+    # Minimal transform for the majority 'FAKE' class
+    fake_train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(), # Still good to have some augmentation
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
 
     val_transform = transforms.Compose([
         transforms.ToTensor(),
@@ -115,14 +144,14 @@ def get_data_loaders():
     ])
     
     # Using the same transform for train, validation, and test sets
-    train_dataset = DeepfakeDataset(video_ids=train_val_df.index.tolist(), labels=train_val_df['label'].tolist(), transform=val_transform)
-    val_dataset = DeepfakeDataset(video_ids=val_df.index.tolist(), labels=val_df['label'].tolist(), transform=val_transform)
-    test_dataset = DeepfakeDataset(video_ids=test_df.index.tolist(), labels=test_df['label'].tolist(), transform=val_transform)
+    train_dataset = DeepfakeDataset(video_ids=train_df.index.tolist(), labels=train_df['label'].tolist(), real_transform=real_train_transform, fake_transform=fake_train_transform)
+    val_dataset = DeepfakeDataset(video_ids=val_df.index.tolist(), labels=val_df['label'].tolist(), real_transform=real_train_transform, fake_transform=fake_train_transform)
+    # test_dataset = DeepfakeDataset(video_ids=test_df.index.tolist(), labels=test_df['label'].tolist(), transform=val_transform)
 
-    class_counts = train_val_df['label'].value_counts().to_dict()
+    class_counts = train_df['label'].value_counts().to_dict()
     num_samples = len(train_dataset)
     
-    weights = [1.0 / class_counts[label] for label in train_val_df['label'].tolist()]
+    weights = [1.0 / class_counts[label] for label in train_df['label'].tolist()]
     sample_weights = torch.DoubleTensor(weights)
     
     sampler = WeightedRandomSampler(sample_weights, num_samples)
@@ -130,7 +159,7 @@ def get_data_loaders():
     train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, sampler=sampler, num_workers=NUM_WORKERS, pin_memory=True)
     
     val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
+    # test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
     
     print(f"Data loading complete. Using stratified sampling for training set.")
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader

@@ -27,8 +27,8 @@ class LRATF(nn.Module):
     def __init__(self, num_classes=1):
         super(LRATF, self).__init__()
 
-        # Use a non-pretrained MobileNetV3, allowing the full network to train
-        self.feature_extractor = mobilenet_v3_small(weights=None).features
+    
+        self.feature_extractor = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1).features
         
         backbone_out_features = BACKBONE_OUT_FEATURES
         
@@ -57,10 +57,10 @@ class LRATF(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(6 * self.attention_embedding_dim, 256),
             nn.ReLU(),
-            # nn.Dropout(0.5),
+            nn.Dropout(0.3),
             nn.Linear(256, 128),
             nn.ReLU(),
-            # nn.Dropout(0.5),
+            nn.Dropout(0.3),
             nn.Linear(128, num_classes)
         )
 
