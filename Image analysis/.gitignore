@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+venv/
+processed_dataset/
+dataset/
+features/
+*.h5

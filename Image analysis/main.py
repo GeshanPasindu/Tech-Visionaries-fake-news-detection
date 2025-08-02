@@ -1,16 +1,19 @@
 import os
 
-print("🚀 Running Preprocessing...")
-os.system("python scripts/preprocess.py")
+# print("🚀 Running Preprocessing...")
+# os.system("python scripts/preprocess.py")
 
 # print("🚀 Running Feature Extraction...")
 # os.system("python scripts/feature_extract.py")
 
-print("🚀 Running model training...")
-os.system("python scripts/train_vgg16.py")
+# print("🚀 Running data loader...")
+# os.system("python scripts/data_loader.py")
+
+# print("🚀 Running model training...")
+# os.system("python scripts/train_model.py")
 
 print("🚀 Running model testing...")
-os.system("python scripts/test_vgg16.py")
+os.system("python scripts/test_model.py")
 
 print("✅ All steps completed successfully!")
 
