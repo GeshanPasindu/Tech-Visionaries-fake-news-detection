@@ -1,8 +1,0 @@
-torch
-# opencv-python-headless
-numpy
-pandas
-mediapipe
-tqdm
-# ffmpeg-python
-av
