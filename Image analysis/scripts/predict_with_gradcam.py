@@ -343,7 +343,8 @@ from tensorflow.keras.applications.efficientnet import preprocess_input
 from tkinter import Tk, filedialog
 
 # ---------------------- Load Trained Model ----------------------
-MODEL_PATH = './efficientnet_b4_finetuned.h5'
+MODEL_PATH = 'C:/Users/MSI/Documents/Git/Tech-Visionaries-fake-news-detection/Image analysis/scripts/efficientnet_b4_finetuned.h5'
+
 model = load_model(MODEL_PATH)
 
 # ---------------------- Image Preprocessing ----------------------
@@ -420,6 +421,8 @@ def make_prediction(img_path):
         generate_gradcam(model, img_tensor, orig_img, save_path="heatmap_output.jpg")
     else:
         print("No heatmap generated for authentic image.")
+
+    return prediction, label, orig_img
 
 # ---------------------- File Dialog Interface ----------------------
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ def get_test_loader():
     Creates a DataLoader for the test set.
     """
     print("Loading and preparing test data...")
-    metadata = pd.read_json(METADATA_PATH).T
+    metadata = pd.read_json(TEST_METADATA_PATH).T
     df = metadata.copy()
     df['label'] = df['label'].apply(lambda x: 1 if x == 'FAKE' else 0)
 
@@ -41,9 +41,9 @@ def get_test_loader():
 
     def is_valid_sample(video_id):
         video_basename = os.path.splitext(video_id)[0]
-        frame_dir_path = os.path.normpath(os.path.join(FRAMES_DIR, video_basename))
-        landmark_dir_path = os.path.normpath(os.path.join(LANDMARKS_DIR, video_basename))
-        motion_vector_path = os.path.normpath(os.path.join(MOTION_VECTORS_DIR, f'{video_basename}_mv.npy'))
+        frame_dir_path = os.path.normpath(os.path.join(TEST_FRAMES_DIR, video_basename))
+        landmark_dir_path = os.path.normpath(os.path.join(TEST_LANDMARKS_DIR, video_basename))
+        motion_vector_path = os.path.normpath(os.path.join(TEST_MOTION_VECTORS_DIR, f'{video_basename}_mv.npy'))
         
         return (os.path.isdir(frame_dir_path) and
                 os.path.isdir(landmark_dir_path) and

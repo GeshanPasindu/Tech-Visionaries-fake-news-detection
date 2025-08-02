@@ -12,12 +12,21 @@ METADATA_PATH = os.path.join(BASE_DIR, 'data/raw/DFDC/metadata.json')
 MODEL_SAVE_DIR = os.path.join(BASE_DIR, 'models/student_lratf/')
 MOTION_VECTORS_DIR = os.path.join(PROCESSED_DATA_DIR, 'motion_vectors')
 
+TEST_PROCESSED_DATA_DIR = os.path.join(BASE_DIR, 'data/test_processed/')
+TEST_FRAMES_DIR = os.path.join(TEST_PROCESSED_DATA_DIR, 'frames')
+TEST_LANDMARKS_DIR = os.path.join(TEST_PROCESSED_DATA_DIR, 'landmarks')
+TEST_METADATA_PATH = os.path.join(BASE_DIR, 'data/raw/DFDC/metadata.json')
+TEST_MODEL_SAVE_DIR = os.path.join(BASE_DIR, 'models/student_lratf/')
+TEST_MOTION_VECTORS_DIR = os.path.join(TEST_PROCESSED_DATA_DIR, 'motion_vectors')
+
+
+
 # --- Training Hyperparameters ---
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 LEARNING_RATE = 3e-5
 BATCH_SIZE = 8
-NUM_EPOCHS = 350
+NUM_EPOCHS = 200
 NUM_WORKERS = 4
 
 

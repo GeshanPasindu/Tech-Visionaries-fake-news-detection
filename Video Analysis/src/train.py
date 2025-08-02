@@ -147,7 +147,7 @@ def main():
     model = LRATF().to(DEVICE)
     
     # loss_fn = nn.BCEWithLogitsLoss()
-    loss_fn = FocalLoss(alpha=0.32, gamma=2.0)
+    loss_fn = FocalLoss(alpha=0.27, gamma=2.0)
     
     # <<< MODIFIED: Reduced weight_decay to a small, standard value >>>
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE,weight_decay=1e-5)

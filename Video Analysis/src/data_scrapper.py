@@ -1,5 +1,6 @@
 import os
-import csv
+# import csv
+import json
 import yt_dlp
 
 # 50 deepfake video URLs
@@ -48,12 +49,16 @@ deepfake_urls = [
     "https://youtu.be/XuKUkyPegBE?si=URzyH4F3gqOpC0vh",
     "https://youtu.be/SKlthQfN6io?si=pMXixLFE8qLLNXE0",
     "https://youtu.be/3BGRGeH-BP8?si=0HDP-ZiuT4HfwlgX",
-    "https://youtu.be/3p0ITSDy1JU?si=t_slVLzZ0j06dwVg",
+    "https://youtu.be/PSL4KdTUFKU?si=5BQO6xExzHyEf28e",
     "https://youtu.be/LTQfBfvpv_k?si=EBWl_iWWGBvUWkKe",
     "https://youtu.be/pnPgfscR5gA?si=bIR1Uuwc2VOLxlIn",
     "https://www.youtube.com/shorts/j0WjIm2Fbuk",
     "https://youtu.be/R43dwcplFO4?si=sqmq4COfcrUYp-uz",
-    "https://youtu.be/8OJnkJqkyio?si=wMdytw7bd7lr11KN"
+    "https://youtu.be/8OJnkJqkyio?si=wMdytw7bd7lr11KN",
+    "https://youtu.be/3ntguiZab3s?si=R2sv7pDKYaug41Ax",
+    "https://youtu.be/LTQfBfvpv_k?si=VyBqfH48KmOedExr",
+    "https://youtu.be/HN-qlGf2mZw?si=sr60r1YRGFRxSEEh",
+    "https://youtu.be/oxVcokRghpE?si=gRCTNGXp1jBHswAi"
 ]
 
 # 50 real interview video URLs
@@ -134,6 +139,7 @@ def download_and_log(urls, label):
                 metadata[filename] = {
                     'filename': filename,
                     'label': label,
+                    'split':'test'
                 }
         except yt_dlp.utils.DownloadError:
             # Catch the error specifically for download issues
@@ -145,14 +151,15 @@ def download_and_log(urls, label):
             skipped_urls.append(url)
 
 # Download
-download_and_log(deepfake_urls, "deepfake")
-download_and_log(real_urls, "real")
+download_and_log(deepfake_urls, "FAKE")
+download_and_log(real_urls, "REAL")
 
 # Save metadata
-with open("data/test/metadata.csv", "w", newline='', encoding="utf-8") as f:
-    writer = csv.DictWriter(f, fieldnames=["filename", "label", "source", "url"])
-    writer.writeheader()
-    writer.writerows(metadata.values())
+# with open("data/test/metadata.csv", "w", newline='', encoding="utf-8") as f:
+#     writer = csv.DictWriter(f, fieldnames=["filename", "label", "source", "url"])
+#     writer.writeheader()
+#     writer.writerows(metadata.values())
+with open("data/test/metadata.json", "w", encoding="utf-8") as f:json.dump(metadata, f, indent=4)
 
 print("\n--- Summary ---")
 print(f"✅ Download complete. Metadata for {len(metadata)} videos saved to dataset/metadata.csv")

@@ -6,9 +6,11 @@ import pandas as pd
 import re
 from textblob import TextBlob
 import emoji
+import os
 
 # --- Load Model and Tokenizer ---
-model_path = "./fake_news_model"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, "fake_news_model")
 tokenizer = DistilBertTokenizer.from_pretrained(model_path)
 model = DistilBertForSequenceClassification.from_pretrained(model_path)
 model.eval()

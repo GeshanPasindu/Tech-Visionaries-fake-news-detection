@@ -36,19 +36,31 @@ class LRATF(nn.Module):
     def __init__(self, num_classes=1, backbone_out_features=576):
         super(LRATF, self).__init__()
         self.feature_extractor = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1).features
-        self.mouth_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
-        self.nose_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
-        self.eyes_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
-        self.eyebrows_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
-        self.chin_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        
+        # --- Updated to 10 regional LSTMs ---
+        self.upper_lip_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.lower_lip_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.left_eye_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.right_eye_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.nose_bridge_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.left_cheek_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.right_cheek_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.left_eyebrow_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.right_eyebrow_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        self.chin_jawline_lstm = nn.LSTM(input_size=backbone_out_features, hidden_size=64, bidirectional=True, batch_first=True)
+        
         self.mv_encoder = MotionVectorEncoder(input_dim=2, embedding_dim=64)
         self.mv_lstm = nn.LSTM(input_size=64, hidden_size=32, bidirectional=True, batch_first=True)
+        
         self.attention_embedding_dim = 128
         self.visual_proj = nn.Linear(128, self.attention_embedding_dim)
         self.motion_proj = nn.Linear(64, self.attention_embedding_dim)
+        
         self.attention_layer = nn.MultiheadAttention(embed_dim=self.attention_embedding_dim, num_heads=4, batch_first=True)
+        
+        # --- Updated classifier input size (10 visual streams + 1 motion stream = 11) ---
         self.classifier = nn.Sequential(
-            nn.Linear(6 * self.attention_embedding_dim, 256),
+            nn.Linear(11 * self.attention_embedding_dim, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, 128),
@@ -56,51 +68,72 @@ class LRATF(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(128, num_classes)
         )
-
+        
     def get_region_boxes(self, landmarks, img_shape):
         h, w = img_shape
         regions = [
-            landmarks[:, 61:80, :2], landmarks[:, 291:300, :2], landmarks[:, 362:388, :2],
-            torch.cat([landmarks[:, 63:70, :2], landmarks[:, 293:300, :2]], dim=1),
-            landmarks[:, [172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 397], :2]
+            landmarks[:, [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291], :2],  # Upper Lip
+            landmarks[:, [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291], :2],  # Lower Lip
+            landmarks[:, [362, 382, 381, 380, 374, 373, 390, 249, 263], :2],  # Left Eye
+            landmarks[:, [33, 7, 163, 144, 145, 153, 154, 155, 133], :2],  # Right Eye
+            landmarks[:, [6, 197, 195, 5, 4, 1, 19, 94, 2], :2],  # Nose Bridge & Tip
+            landmarks[:, [200, 426, 431, 411, 444, 396, 266, 350, 446], :2],  # Left Cheek
+            landmarks[:, [45, 234, 248, 243, 44, 107, 59, 10, 336], :2],  # Right Cheek
+            landmarks[:, [276, 283, 282, 295, 300, 293], :2],  # Left Eyebrow
+            landmarks[:, [46, 53, 52, 65, 70, 63], :2],  # Right Eyebrow
+            landmarks[:, [152, 172, 176, 148, 150, 149, 176, 172, 152], :2]  # Chin & Jawline
         ]
+        
         boxes = []
         for region_pts in regions:
             x_coords, y_coords = region_pts[:, :, 0] * w, region_pts[:, :, 1] * h
             boxes.append(torch.stack([torch.min(x_coords, dim=1)[0], torch.min(y_coords, dim=1)[0],
-                                      torch.max(x_coords, dim=1)[0], torch.max(y_coords, dim=1)[0]], dim=1))
+                                     torch.max(x_coords, dim=1)[0], torch.max(y_coords, dim=1)[0]], dim=1))
         return boxes
 
     def forward(self, x, landmarks, motion_vectors):
         b, s, _, h, w = x.shape
-        regional_features_seq = [[] for _ in range(5)]
+        regional_features_seq = [[] for _ in range(10)]
         for t in range(s):
             features = self.feature_extractor(x[:, t])
             boxes = self.get_region_boxes(landmarks[:, t], (h, w))
             box_indices = torch.arange(b, device=x.device).view(-1, 1)
-            for i in range(5):
+            for i in range(10): # Loop over 10 regions
                 rois = torch.cat([box_indices, boxes[i]], dim=1)
                 aligned_features = roi_align(features, rois.float(), output_size=(1, 1), spatial_scale=1.0 / 16.0).squeeze(-1).squeeze(-1)
                 regional_features_seq[i].append(aligned_features)
 
         sequences = [torch.stack(seq, dim=1) for seq in regional_features_seq]
         
-        _, (h_mouth, _) = self.mouth_lstm(sequences[0])
-        _, (h_nose, _) = self.nose_lstm(sequences[1])
-        _, (h_eyes, _) = self.eyes_lstm(sequences[2])
-        _, (h_eyebrows, _) = self.eyebrows_lstm(sequences[3])
-        _, (h_chin, _) = self.chin_lstm(sequences[4])
+        _, (h_upper_lip, _) = self.upper_lip_lstm(sequences[0])
+        _, (h_lower_lip, _) = self.lower_lip_lstm(sequences[1])
+        _, (h_left_eye, _) = self.left_eye_lstm(sequences[2])
+        _, (h_right_eye, _) = self.right_eye_lstm(sequences[3])
+        _, (h_nose_bridge, _) = self.nose_bridge_lstm(sequences[4])
+        _, (h_left_cheek, _) = self.left_cheek_lstm(sequences[5])
+        _, (h_right_cheek, _) = self.right_cheek_lstm(sequences[6])
+        _, (h_left_eyebrow, _) = self.left_eyebrow_lstm(sequences[7])
+        _, (h_right_eyebrow, _) = self.right_eyebrow_lstm(sequences[8])
+        _, (h_chin_jawline, _) = self.chin_jawline_lstm(sequences[9])
         
         mv_embeddings = self.mv_encoder(motion_vectors)
         _, (h_mv, _) = self.mv_lstm(mv_embeddings)
-
+        
         h_streams = [
-            torch.cat((h_mouth[-2,:,:], h_mouth[-1,:,:]), dim=1), torch.cat((h_nose[-2,:,:], h_nose[-1,:,:]), dim=1),
-            torch.cat((h_eyes[-2,:,:], h_eyes[-1,:,:]), dim=1), torch.cat((h_eyebrows[-2,:,:], h_eyebrows[-1,:,:]), dim=1),
-            torch.cat((h_chin[-2,:,:], h_chin[-1,:,:]), dim=1), torch.cat((h_mv[-2,:,:], h_mv[-1,:,:]), dim=1)
+            torch.cat((h_upper_lip[-2,:,:], h_upper_lip[-1,:,:]), dim=1),
+            torch.cat((h_lower_lip[-2,:,:], h_lower_lip[-1,:,:]), dim=1),
+            torch.cat((h_left_eye[-2,:,:], h_left_eye[-1,:,:]), dim=1),
+            torch.cat((h_right_eye[-2,:,:], h_right_eye[-1,:,:]), dim=1),
+            torch.cat((h_nose_bridge[-2,:,:], h_nose_bridge[-1,:,:]), dim=1),
+            torch.cat((h_left_cheek[-2,:,:], h_left_cheek[-1,:,:]), dim=1),
+            torch.cat((h_right_cheek[-2,:,:], h_right_cheek[-1,:,:]), dim=1),
+            torch.cat((h_left_eyebrow[-2,:,:], h_left_eyebrow[-1,:,:]), dim=1),
+            torch.cat((h_right_eyebrow[-2,:,:], h_right_eyebrow[-1,:,:]), dim=1),
+            torch.cat((h_chin_jawline[-2,:,:], h_chin_jawline[-1,:,:]), dim=1),
+            torch.cat((h_mv[-2,:,:], h_mv[-1,:,:]), dim=1)
         ]
-
-        proj_streams = [self.visual_proj(s) for s in h_streams[:5]] + [self.motion_proj(h_streams[5])]
+        
+        proj_streams = [self.visual_proj(s) for s in h_streams[:10]] + [self.motion_proj(h_streams[10])]
         
         attention_input = torch.stack(proj_streams, dim=1)
         attention_output, _ = self.attention_layer(attention_input, attention_input, attention_input)
