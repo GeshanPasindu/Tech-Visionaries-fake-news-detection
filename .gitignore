@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+venv/
+processed_dataset/
+dataset/
+features/
+*.h5
+*.jpg
+efficientnet_b4_model.h5
