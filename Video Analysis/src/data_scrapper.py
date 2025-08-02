@@ -36,7 +36,7 @@ deepfake_urls = [
     "https://youtube.com/shorts/TnuDI4GwWLA?si=dfL1sHq0ZzB6xxzh",
     "https://youtube.com/shorts/MFSxylb1aCU?si=_KZdUIg78CeROCFJ",
     "https://youtube.com/shorts/bf6xpLM_p0o?si=7HqpdlkkqH1tuzKW",
-    "https://youtube.com/shorts/bf6xpLM_p0o?si=aJqvSog-g6UAAz5a", 
+    "https://youtube.com/shorts/bf6xpLM_p0o?si=aJqvSog-g6UAAz5a",
     "https://youtube.com/shorts/SwIkPAGHEGs?si=mkbgyggjnLlxPwa8",
     "https://youtube.com/shorts/1_bZWso5G0w?si=uR4S5MxYjgD7a0We",
     "https://youtube.com/shorts/LYsNRtEZRV4?si=Viu5dE-ZqDemYvXs",
@@ -112,22 +112,37 @@ real_urls = [
 
 # Make folders
 os.makedirs("data/test", exist_ok=True)
-# os.makedirs("dataset/real", exist_ok=True)
 
-metadata = []
-ydl_opts = {'format': 'mp4'}
+metadata = {}
+skipped_urls = []
+
 
 # Download function
 def download_and_log(urls, label):
     for url in urls:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = f"{info['id']}.mp4"
-            os.replace(filename, f"data/test/{filename}")
-            metadata.append({
-                'filename': filename,
-                'label': label,
-            })
+        ydl_opts = {
+            'format': 'mp4',
+            'outtmpl': f"data/test/%(id)s.%(ext)s",
+            # Remove the cookiesfrombrowser option since you want to skip these videos
+            # 'cookiesfrombrowser': 'chrome',
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = f"{info['id']}.mp4"
+                metadata[filename] = {
+                    'filename': filename,
+                    'label': label,
+                }
+        except yt_dlp.utils.DownloadError:
+            # Catch the error specifically for download issues
+            print(f"⚠️ Skipping video due to download error: {url}")
+            skipped_urls.append(url)
+        except Exception as e:
+            # Catch any other unexpected errors
+            print(f"❌ An unexpected error occurred with {url}: {e}")
+            skipped_urls.append(url)
 
 # Download
 download_and_log(deepfake_urls, "deepfake")
@@ -137,6 +152,12 @@ download_and_log(real_urls, "real")
 with open("data/test/metadata.csv", "w", newline='', encoding="utf-8") as f:
     writer = csv.DictWriter(f, fieldnames=["filename", "label", "source", "url"])
     writer.writeheader()
-    writer.writerows(metadata)
+    writer.writerows(metadata.values())
 
-print("✅ Download complete. Metadata saved to dataset/metadata.csv")
+print("\n--- Summary ---")
+print(f"✅ Download complete. Metadata for {len(metadata)} videos saved to dataset/metadata.csv")
+if skipped_urls:
+    print(f"❌ Skipped {len(skipped_urls)} videos.")
+    print("Skipped URLs:")
+    for url in skipped_urls:
+        print(f"  - {url}")

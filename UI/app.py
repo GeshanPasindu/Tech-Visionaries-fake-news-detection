@@ -60,7 +60,7 @@ def main():
     """)
 
     st.sidebar.title("⚙️ Configuration")
-    model_path_default = "C:/Users/MSI/Documents/Git/Tech-Visionaries-fake-news-detection/Video Analysis/models/student_lratf/best_model_epoch_133_auc_0.9579.pth"
+    model_path_default = "C:/Users/MSI/Documents/Git/Tech-Visionaries-fake-news-detection/Video Analysis/models/student_lratf/best_model_epoch_307_auc_0.9682.pth"
     model_path = st.sidebar.text_input("Model Path (.pth)", value=model_path_default)
 
     if not os.path.exists(model_path):
