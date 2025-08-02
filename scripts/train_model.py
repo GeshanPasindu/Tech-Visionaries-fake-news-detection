@@ -190,6 +190,184 @@
 # print(f"✅ Model saved to {model_path}")
 
 
+
+# import os
+# import numpy as np
+# import tensorflow as tf
+# from glob import glob
+# from sklearn.model_selection import train_test_split
+# from tensorflow.keras.applications.efficientnet import EfficientNetB4, preprocess_input
+# from tensorflow.keras.models import Model
+# from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
+# from tensorflow.keras.optimizers import Adam
+# from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+
+# # Constants
+# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# DATASET_PATH = os.path.join(SCRIPT_DIR, "..", "processed_dataset")
+# IMAGE_SIZE = (380, 380)
+# BATCH_SIZE = 16
+# EPOCHS = 10
+# NUM_CLASSES = 2
+# MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "efficientnet_b4_model.h5")
+
+# # Load image paths and labels
+# class_names = sorted(os.listdir(DATASET_PATH))
+# image_paths = []
+# labels = []
+
+# for idx, class_name in enumerate(class_names):
+#     class_dir = os.path.join(DATASET_PATH, class_name)
+#     if os.path.isdir(class_dir):
+#         for ext in ("*.jpg", "*.jpeg", "*.png"):
+#             for file in glob(os.path.join(class_dir, ext)):
+#                 image_paths.append(file)
+#                 labels.append(idx)
+
+# image_paths = np.array(image_paths)
+# labels = np.array(labels)
+
+# # Split dataset
+# train_paths, val_paths, train_labels, val_labels = train_test_split(
+#     image_paths, labels, test_size=0.2, stratify=labels, random_state=42
+# )
+
+
+# def parse_image(filename, label):
+#     image = tf.io.read_file(filename)
+#     image = tf.image.decode_jpeg(image, channels=3)
+#     image = tf.image.resize(image, IMAGE_SIZE)
+#     image = preprocess_input(image)
+#     return image, tf.one_hot(label, NUM_CLASSES)
+
+# def build_dataset(paths, labels, is_train=True):
+#     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
+#     ds = ds.map(parse_image, num_parallel_calls=tf.data.AUTOTUNE)
+#     if is_train:
+#         ds = ds.shuffle(buffer_size=1000)
+#     ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+#     return ds
+
+# train_dataset = build_dataset(train_paths, train_labels, is_train=True)
+# val_dataset = build_dataset(val_paths, val_labels, is_train=False)
+
+# # Model
+# base_model = EfficientNetB4(include_top=False, weights='imagenet', input_shape=(380, 380, 3))
+# base_model.trainable = False  
+
+# x = base_model.output
+# x = GlobalAveragePooling2D()(x)
+# x = Dropout(0.5)(x)
+# output = Dense(NUM_CLASSES, activation='softmax')(x)
+
+# model = Model(inputs=base_model.input, outputs=output)
+# model.compile(optimizer=Adam(1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+
+# # Callbacks
+# callbacks = [
+#     ModelCheckpoint(MODEL_SAVE_PATH, save_best_only=True, monitor="val_accuracy", mode="max"),
+#     EarlyStopping(patience=5, restore_best_weights=True)
+# ]
+
+# # Train
+# model.fit(train_dataset, validation_data=val_dataset, epochs=EPOCHS, callbacks=callbacks)
+
+
+
+
+# import os
+# import numpy as np
+# import tensorflow as tf
+# from glob import glob
+# from sklearn.model_selection import train_test_split
+# from tensorflow.keras.applications.efficientnet import EfficientNetB4, preprocess_input
+# from tensorflow.keras.models import Model
+# from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
+# from tensorflow.keras.optimizers import Adam
+# from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+
+# # Constants
+# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# DATASET_PATH = os.path.join(SCRIPT_DIR, "..", "processed_dataset")
+# IMAGE_SIZE = (380, 380)
+# BATCH_SIZE = 16
+# EPOCHS = 10
+# MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "efficientnet_b4_finetuned.h5")
+
+# # Explicit label mapping
+# label_map = {"Authentic": 0, "Tampered": 1}
+# image_paths = []
+# labels = []
+
+# # Load image paths and labels
+# for class_name, label in label_map.items():
+#     class_dir = os.path.join(DATASET_PATH, class_name)
+#     for ext in ("*.jpg", "*.jpeg", "*.png"):
+#         for file in glob(os.path.join(class_dir, ext)):
+#             image_paths.append(file)
+#             labels.append(label)
+
+# image_paths = np.array(image_paths)
+# labels = np.array(labels)
+
+# # Split dataset
+# train_paths, val_paths, train_labels, val_labels = train_test_split(
+#     image_paths, labels, test_size=0.2, stratify=labels, random_state=42
+# )
+
+# # Preprocessing function
+# def parse_image(filename, label):
+#     image = tf.io.read_file(filename)
+#     image = tf.image.decode_jpeg(image, channels=3)
+#     image = tf.image.resize(image, IMAGE_SIZE)
+#     image = preprocess_input(image)
+#     return image, tf.cast(label, tf.float32)
+
+# def build_dataset(paths, labels, is_train=True):
+#     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
+#     ds = ds.map(parse_image, num_parallel_calls=tf.data.AUTOTUNE)
+#     if is_train:
+#         ds = ds.shuffle(buffer_size=1000)
+#     ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+#     return ds
+
+# train_dataset = build_dataset(train_paths, train_labels, is_train=True)
+# val_dataset = build_dataset(val_paths, val_labels, is_train=False)
+
+# # Build model
+# base_model = EfficientNetB4(include_top=False, weights='imagenet', input_shape=(380, 380, 3))
+# base_model.trainable = False  # Freeze initially
+
+# x = base_model.output
+# x = GlobalAveragePooling2D()(x)
+# x = Dropout(0.5)(x)
+# output = Dense(1, activation='sigmoid')(x)  # Binary output
+
+# model = Model(inputs=base_model.input, outputs=output)
+# model.compile(optimizer=Adam(1e-4), loss='binary_crossentropy', metrics=['accuracy'])
+
+# # Callbacks
+# callbacks = [
+#     ModelCheckpoint(MODEL_SAVE_PATH, save_best_only=True, monitor="val_accuracy", mode="max"),
+#     EarlyStopping(patience=5, restore_best_weights=True)
+# ]
+
+# # Train initial frozen model
+# model.fit(train_dataset, validation_data=val_dataset, epochs=5, callbacks=callbacks)
+
+# # 🔄 Fine-tune top 20 layers
+# base_model.trainable = True
+# for layer in base_model.layers[:-20]:
+#     layer.trainable = False
+
+# model.compile(optimizer=Adam(1e-5), loss='binary_crossentropy', metrics=['accuracy'])
+
+# # Continue training
+# model.fit(train_dataset, validation_data=val_dataset, epochs=EPOCHS, callbacks=callbacks)
+
+# print("✅ Model training and fine-tuning complete.")
+
+
 import os
 import numpy as np
 import tensorflow as tf
@@ -203,25 +381,24 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 # Constants
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATASET_PATH = os.path.join(SCRIPT_DIR, "..", "processed_dataset")
+DATASET_PATH = os.path.join(SCRIPT_DIR, "..", "features")  # ← Use ELA features
 IMAGE_SIZE = (380, 380)
 BATCH_SIZE = 16
 EPOCHS = 10
-NUM_CLASSES = 2
-MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "efficientnet_b4_model.h5")
+MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "efficientnet_b4_forgery_detector.h5")
 
-# Load image paths and labels
-class_names = sorted(os.listdir(DATASET_PATH))
+# Explicit label mapping
+label_map = {"Authentic": 0, "Tampered": 1}
 image_paths = []
 labels = []
 
-for idx, class_name in enumerate(class_names):
+# Load image paths and labels (include TIFF formats)
+for class_name, label in label_map.items():
     class_dir = os.path.join(DATASET_PATH, class_name)
-    if os.path.isdir(class_dir):
-        for ext in ("*.jpg", "*.jpeg", "*.png"):
-            for file in glob(os.path.join(class_dir, ext)):
-                image_paths.append(file)
-                labels.append(idx)
+    for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff"):
+        files = glob(os.path.join(class_dir, ext))
+        image_paths.extend(files)
+        labels.extend([label] * len(files))
 
 image_paths = np.array(image_paths)
 labels = np.array(labels)
@@ -231,13 +408,13 @@ train_paths, val_paths, train_labels, val_labels = train_test_split(
     image_paths, labels, test_size=0.2, stratify=labels, random_state=42
 )
 
-# Preprocessing
+# Preprocessing function (supports all image types)
 def parse_image(filename, label):
     image = tf.io.read_file(filename)
-    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.decode_image(image, channels=3, expand_animations=False)  # format-agnostic
     image = tf.image.resize(image, IMAGE_SIZE)
     image = preprocess_input(image)
-    return image, tf.one_hot(label, NUM_CLASSES)
+    return image, tf.cast(label, tf.float32)
 
 def build_dataset(paths, labels, is_train=True):
     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
@@ -247,20 +424,21 @@ def build_dataset(paths, labels, is_train=True):
     ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
     return ds
 
+# Build training and validation datasets
 train_dataset = build_dataset(train_paths, train_labels, is_train=True)
 val_dataset = build_dataset(val_paths, val_labels, is_train=False)
 
-# Model
+# Build model
 base_model = EfficientNetB4(include_top=False, weights='imagenet', input_shape=(380, 380, 3))
-base_model.trainable = False  # Fine-tuning later
+base_model.trainable = False  # Freeze initially
 
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = Dropout(0.5)(x)
-output = Dense(NUM_CLASSES, activation='softmax')(x)
+output = Dense(1, activation='sigmoid')(x)  # Binary classification
 
 model = Model(inputs=base_model.input, outputs=output)
-model.compile(optimizer=Adam(1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer=Adam(1e-4), loss='binary_crossentropy', metrics=['accuracy'])
 
 # Callbacks
 callbacks = [
@@ -268,5 +446,19 @@ callbacks = [
     EarlyStopping(patience=5, restore_best_weights=True)
 ]
 
-# Train
+# Step 1: Train with frozen base
+model.fit(train_dataset, validation_data=val_dataset, epochs=5, callbacks=callbacks)
+
+# Step 2: Fine-tune top 20 layers
+base_model.trainable = True
+for layer in base_model.layers[:-20]:
+    layer.trainable = False
+
+model.compile(optimizer=Adam(1e-5), loss='binary_crossentropy', metrics=['accuracy'])
+
+# Continue training with fine-tuning
 model.fit(train_dataset, validation_data=val_dataset, epochs=EPOCHS, callbacks=callbacks)
+
+print("✅ Model training and fine-tuning complete with .jpg and .tif ELA features.")
+
+

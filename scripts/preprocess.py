@@ -61,6 +61,7 @@
 #     print("✅ Preprocessing complete! Processed images saved in 'processed_dataset/'")
 
 
+
 import os
 import cv2
 import numpy as np
@@ -74,28 +75,29 @@ PROCESSED_PATH = os.path.join(SCRIPT_DIR, "..", "processed_dataset")
 # Ensure processed dataset folder exists
 os.makedirs(PROCESSED_PATH, exist_ok=True)
 
-# Preprocessing Function (Resize & Save for EfficientNet-B4)
+# Preprocessing Function 
 def preprocess_image(image_path, save_path, size=(380, 380)):
     """
-    Reads an image, resizes it to (380, 380), and saves as RGB.
+    Reads an image, resizes it to (380, 380), and saves as RGB in .jpg format.
     """
     try:
         img = cv2.imread(image_path)
         if img is None:
             print(f"Skipping: {image_path} (Not a valid image)")
             return
-        
-        # Resize and ensure RGB (EfficientNet expects 3 channels)
+
+        # Resize and convert to RGB
         img_resized = cv2.resize(img, size)
-        img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)  # OpenCV loads as BGR
-        
-        # Save processed image
-        cv2.imwrite(save_path, cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))  # Save as BGR for consistency
+        img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
+
+        # Save processed image in JPEG format
+        save_path_jpg = os.path.splitext(save_path)[0] + ".jpg"
+        cv2.imwrite(save_path_jpg, cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))
 
     except Exception as e:
         print(f"Error processing {image_path}: {e}")
 
-# Process all images (split into train/test later)
+# Process all images 
 def process_dataset():
     for category in ["Authentic", "Tampered"]:
         input_folder = os.path.join(DATASET_PATH, category)
@@ -105,9 +107,14 @@ def process_dataset():
         print(f"Processing {category} images...")
         for image_name in tqdm(os.listdir(input_folder)):
             image_path = os.path.join(input_folder, image_name)
-            save_path = os.path.join(output_folder, image_name)
+
+            # Use same base name, change to .jpg
+            base_name = os.path.splitext(image_name)[0] + ".jpg"
+            save_path = os.path.join(output_folder, base_name)
+
             preprocess_image(image_path, save_path)
 
 if __name__ == "__main__":
     process_dataset()
-    print("✅ Preprocessing complete! Images saved in 'processed_dataset/'")
+    print("✅ Preprocessing complete! Images saved in 'processed_dataset/' as .jpg")
+
