@@ -6,14 +6,12 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
-# Download necessary NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# Ask user which dataset to load
 print("\nWhich dataset do you want to load?")
-print("1: Dataset with emojis (real_fake_dataset_with_emojies.json)")
+print("1: Dataset with emojis (english_test_with_labels.json)")
 print("2: Dataset without emojis (fake_or_real_news.csv)")
 choice = input("Enter 1 or 2: ")
 
@@ -39,17 +37,22 @@ except Exception as e:
     print("❌ Failed to load dataset:", e)
     exit()
 
-# Show raw examples
 print("\n🔍 Sample rows from dataset:")
 print(df[['text']].head())
 
 # Emoji conversion
 def convert_emoji_to_text(text):
-    emoji_text = emoji.demojize(text, delimiters=(" [", "] "))
-    emoji_text = emoji_text.replace('_', ' ')
-    # Remove any leftover empty brackets
-    emoji_text = re.sub(r'\[\s*\]', '', emoji_text)
-    return emoji_text
+    if not isinstance(text, str):
+        return text
+    try:
+        emoji_text = emoji.demojize(text, delimiters=(" [", "] "), language="en")
+        emoji_text = emoji_text.replace('_', ' ')
+        emoji_text = re.sub(r'\[\s*\]', '', emoji_text)
+        return emoji_text
+    except Exception as e:
+        print("❌ Emoji conversion failed for:", text)
+        print("Error:", e)
+        return text
 
 # Preprocessing function
 def preprocess_text(text, convert_emojis=False):
@@ -93,6 +96,6 @@ if 'label' in df.columns:
     preview_cols.append('label')
 
 if is_emoji:
-    print(df[preview_cols].head(50).to_json(orient='records', indent=2, force_ascii=False))
+    print(df[preview_cols].head(125).to_json(orient='records', indent=2, force_ascii=False))
 else:
     print(df[preview_cols].head(200))

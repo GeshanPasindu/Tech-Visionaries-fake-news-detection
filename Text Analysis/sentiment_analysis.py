@@ -29,7 +29,7 @@ for _, row in emoji_df.iterrows():
         polarity_score = (joy + trust) - (sadness + anger + fear + disgust)
         emoji_sentiment[name] = polarity_score
     except:
-        continue  # Skip rows with invalid data
+        continue  
 
 # --- Sentiment Functions ---
 
@@ -37,11 +37,11 @@ for _, row in emoji_df.iterrows():
 def get_text_sentiment(text):
     return TextBlob(str(text)).sentiment.polarity
 
-# Extract [emoji] tokens
+# Extract [emoji] tokens from text
 def extract_emojis(text):
     return re.findall(r'\[([^\[\]]+)\]', str(text))
 
-# Emoji sentiment from detected tags
+# Emoji sentiment using extracted emoji tags
 def get_emoji_sentiment(text):
     emojis = extract_emojis(text)
     if not emojis:
@@ -54,17 +54,21 @@ def get_emoji_sentiment(text):
         if score is not None:
             scores.append(score)
         else:
-            scores.append(0.0)  # Neutral if not found
+            scores.append(0.0)  
 
     return sum(scores) / len(scores) if scores else 0.0
+
+# Hybrid sentiment: fallback to text if emoji is 0.0
+def get_hybrid_sentiment(row):
+    text_score = row['text_sentiment']
+    emoji_score = row['emoji_sentiment']
+    return text_score if emoji_score == 0.0 else (0.4 * text_score) + (0.6 * emoji_score)
 
 # --- Apply Sentiment Analysis ---
 print("\n⚙️ Calculating text and emoji sentiment...")
 df['text_sentiment'] = df['cleaned_text'].apply(get_text_sentiment)
 df['emoji_sentiment'] = df['cleaned_text'].apply(get_emoji_sentiment)
-
-# Combine both for hybrid score
-df['hybrid_sentiment'] = (df['text_sentiment'] + df['emoji_sentiment']) / 2
+df['hybrid_sentiment'] = df.apply(get_hybrid_sentiment, axis=1)
 
 # Save results
 output_path = "sentiment_fake_or_real_news.csv"
@@ -72,4 +76,4 @@ df.to_csv(output_path, index=False)
 
 # Preview
 print("\n✅ Sentiment analysis complete. Sample output:")
-print(df[['cleaned_text', 'text_sentiment', 'emoji_sentiment', 'hybrid_sentiment', 'label']].head(20))
+print(df[['cleaned_text', 'text_sentiment', 'emoji_sentiment', 'hybrid_sentiment', 'label']].head(125))
