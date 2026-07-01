@@ -1,2 +1,4 @@
 data/
 face_landmarker.task
+_pycache_/
+models/
